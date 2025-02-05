@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">WeatherApp</string>
+    <string name="temp_rature">Température</string>
+    <string name="afficher_temp_rature">Afficher Température</string>
+</resources>
