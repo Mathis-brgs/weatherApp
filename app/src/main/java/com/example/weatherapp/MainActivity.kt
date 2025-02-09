@@ -36,14 +36,15 @@ class MainActivity : ComponentActivity() {
 
 
         checkLocationPermission { latitude, longitude ->
-            fetchWeather(latitude, longitude) { temp, city ->
+            fetchWeather(latitude, longitude) { temp, city, description ->
                 runOnUiThread {
                     tvLocation.text = city
                     tvTemperature.text = temp
-
+                    findViewById<TextView>(R.id.tv_weatherDescription).text = description
                 }
             }
         }
+
     }
 
     private fun checkLocationPermission(onLocationAvailable: (Double, Double) -> Unit) {
@@ -64,7 +65,7 @@ class MainActivity : ComponentActivity() {
     ) { isGranted ->
         if (isGranted) {
             getCurrentLocation { latitude, longitude ->
-                fetchWeather(latitude, longitude) { _, _ -> }
+                fetchWeather(latitude, longitude) { _, _,_ -> }
             }
         } else {
             Toast.makeText(this, "Permission refusée", Toast.LENGTH_SHORT).show()
@@ -96,40 +97,55 @@ class MainActivity : ComponentActivity() {
     private fun fetchWeather(
         latitude: Double,
         longitude: Double,
-        onWeatherFetched: (String, String) -> Unit
+        onWeatherFetched: (String, String, String) -> Unit
     ) {
         val location = "$latitude,$longitude"
-        val url = "https://api.tomorrow.io/v4/timelines?location=$location&fields=temperature,weatherCodeFullDay&timesteps=1h&units=metric&apikey=$apiKey"
-        Log.d("WeatherApp", "URL API: $url")
+        val url = "https://api.tomorrow.io/v4/timelines?location=$location&fields=temperature,weatherCode&timesteps=1h&units=metric&apikey=$apiKey"
 
-        CoroutineScope(Dispatchers.Main).launch {
+
+        Log.d("WeatherApp", "URL API: $url") // 🔍 Voir l'URL appelée
+
+        CoroutineScope(Dispatchers.IO).launch {
             try {
                 val geocoder = Geocoder(this@MainActivity, Locale.getDefault())
                 val addressList = geocoder.getFromLocation(latitude, longitude, 1)
                 val city = addressList?.firstOrNull()?.locality ?: "Ville inconnue"
 
-                val response = RetrofitInstance.api.getWeather(location = location, apiKey = apiKey)
+                val response = RetrofitInstance.api.getWeather(location = location, apiKey = apiKey) // ✅ Bien déclarée ici !
 
-                val temperature = response.data.timelines.first().intervals.first().values.temperature
+                Log.d("WeatherApp", "Réponse API : $response") // 🔍 Voir la réponse API
 
+                val firstTimeline = response.data.timelines.firstOrNull()
+                val firstInterval = firstTimeline?.intervals?.firstOrNull()
 
+                if (firstInterval != null) {
+                    val temperature = firstInterval.values.temperature
+                    val weatherCode = firstInterval.values.weatherCode
 
+                    Log.d("WeatherApp", "Température: $temperature, Code météo: $weatherCode") // 🔍 Vérifier les valeurs
 
+                    val weatherDescription = getWeatherDescription(weatherCode)
 
-
-                onWeatherFetched("$temperature°C", city)
-
-
-                val tvWeatherDescription = findViewById<TextView>(R.id.tv_weatherDescription)
-
+                    runOnUiThread {
+                        onWeatherFetched("$temperature°C", city, weatherDescription)
+                    }
+                } else {
+                    Log.e("WeatherApp", "Données indisponibles")
+                    runOnUiThread {
+                        onWeatherFetched("Erreur", "Inconnue", "Données indisponibles")
+                    }
+                }
 
             } catch (e: Exception) {
-                Log.e("WeatherApp", "Error fetching weather: ${e.message}")
-                Toast.makeText(this@MainActivity, "Erreur : ${e.message}", Toast.LENGTH_LONG).show()
-                onWeatherFetched("Erreur", "Inconnue")
+                Log.e("WeatherApp", "Erreur API : ${e.message}")
+                runOnUiThread {
+                    onWeatherFetched("Erreur", "Inconnue", "Erreur météo")
+                }
             }
         }
     }
+
+
 
 
     private fun getWeatherDescription(weatherCode: Int): String {

@@ -22,17 +22,17 @@ data class Interval(
 
 data class Values(
     val temperature: Double,
-
-
+    val weatherCode: Int
 )
 
 interface WeatherApi {
     @GET("v4/timelines")
     suspend fun getWeather(
         @Query("location") location: String,
-        @Query("fields") fields: String = "temperature",
+        @Query("fields") fields: String = "temperature,weatherCode", // ✅ Ajout de `weatherCode`
         @Query("timesteps") timesteps: String = "current",
         @Query("units") units: String = "metric",
         @Query("apikey") apiKey: String
     ): WeatherResponse
+
 }
